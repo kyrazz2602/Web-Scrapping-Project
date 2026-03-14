@@ -311,6 +311,34 @@ html, body, [class*="css"] {
     color: #c8cad8;
     font-size: 0.93rem;
 }
+
+/* ── Delete buttons ── */
+[data-testid*="delete_req"] > button,
+[data-testid*="delete_all"] > button {
+    background: rgba(220,53,69,0.08) !important;
+    border: 1px solid rgba(220,53,69,0.3) !important;
+    color: #dc3545 !important;
+}
+[data-testid*="delete_req"] > button:hover,
+[data-testid*="delete_all"] > button:hover {
+    background: rgba(220,53,69,0.18) !important;
+    color: #ff4d5e !important;
+}
+.danger-confirm > div > button {
+    background: linear-gradient(135deg,#dc3545,#b02a37) !important;
+    color: #fff !important;
+    border: none !important;
+    box-shadow: 0 4px 14px rgba(220,53,69,0.35) !important;
+}
+
+/* ── Override primary button for delete confirm keys ── */
+button[data-testid="baseButton-primary"][kind="primary"]:has(+ *),
+div[data-testid="stButton"]:has(button[key*="confirm_yes"]) > button,
+div[data-testid="stButton"]:has(button[key*="confirm_delete_all_yes"]) > button {
+    background: linear-gradient(135deg, #dc3545, #b02a37) !important;
+    box-shadow: 0 4px 14px rgba(220,53,69,0.3) !important;
+    border: none !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -414,9 +442,72 @@ def render_product_card(product, slot: int = 0):
             st.markdown(f'<div class="url-text">🔗 {url}</div>', unsafe_allow_html=True)
 
         st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-        if st.button("🔎 Analyze Competitors", key=f"analyze_{asin}_{slot}"):
-            st.session_state["analyzing_asin"] = asin
-            st.rerun()
+        btn_a, btn_d = st.columns([2, 1])
+        with btn_a:
+            if st.button("🔎 Analyze Competitors", key=f"analyze_{asin}_{slot}", use_container_width=True):
+                st.session_state["analyzing_asin"] = asin
+                st.rerun()
+        with btn_d:
+            if st.button("🗑 Delete", key=f"delete_req_{asin}_{slot}", use_container_width=True):
+                st.session_state[f"confirm_delete_{asin}"] = True
+
+    # Inline delete confirmation
+    if st.session_state.get(f"confirm_delete_{asin}"):
+        st.markdown(f"""
+        <div style="
+            background: rgba(220,53,69,0.06);
+            border: 1px solid rgba(220,53,69,0.28);
+            border-radius: 10px;
+            padding: 0.85rem 1.1rem;
+            margin: 0.3rem 0 0.6rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        ">
+            <span style="font-size:1rem">⚠️</span>
+            <span style="color:#ff6b7a;font-size:0.87rem;font-weight:600;line-height:1.4">
+                Delete&nbsp;
+                <code style="background:rgba(220,53,69,0.18);padding:2px 7px;
+                             border-radius:5px;color:#ff9aa3;font-size:0.82rem">{asin}</code>
+                &nbsp;and all its competitors? This cannot be undone.
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Inject scoped button styles for this confirmation
+        st.markdown(f"""
+        <style>
+        div[data-testid="stButton"] > button[kind="secondary"][id*="confirm_yes_{asin}"] {{
+            background: linear-gradient(135deg,#dc3545,#b02a37) !important;
+            color: #fff !important;
+            border: none !important;
+        }}
+        </style>
+        """, unsafe_allow_html=True)
+
+        cc1, cc2, _ = st.columns([0.9, 0.9, 4.2])
+        with cc1:
+            if st.button(
+                "🗑 Yes, delete",
+                key=f"confirm_yes_{asin}_{slot}",
+                use_container_width=True,
+                type="primary",
+            ):
+                _db = Database()
+                _db.delete_product(asin)
+                _db.delete_products_by({"parent_asin": asin})
+                st.session_state.pop(f"confirm_delete_{asin}", None)
+                if st.session_state.get("analyzing_asin") == asin:
+                    st.session_state.pop("analyzing_asin", None)
+                st.rerun()
+        with cc2:
+            if st.button(
+                "✖ Cancel",
+                key=f"confirm_no_{asin}_{slot}",
+                use_container_width=True,
+            ):
+                st.session_state.pop(f"confirm_delete_{asin}", None)
+                st.rerun()
 
     st.markdown("<hr class='custom-divider' style='margin:0.8rem 0'>", unsafe_allow_html=True)
 
@@ -564,8 +655,8 @@ def main():
     if products:
         st.markdown("<hr class='custom-divider'>", unsafe_allow_html=True)
 
-        # ── Section header + pagination in one row ──
-        hcol, _, pcol = st.columns([3, 1, 1])
+        # ── Section header + Delete All + pagination ──
+        hcol, del_col, pcol = st.columns([3, 1.2, 1])
         with hcol:
             st.markdown("""
             <div class="section-header">
@@ -577,11 +668,54 @@ def main():
         items_per_page = 10
         total_pages = max(1, (len(products) + items_per_page - 1) // items_per_page)
 
+        with del_col:
+            st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+            if st.button("🗑 Delete All", use_container_width=True, key="delete_all_btn"):
+                st.session_state["confirm_delete_all"] = True
+
         with pcol:
             page = st.number_input(
                 "Page", min_value=1, max_value=total_pages, value=1,
                 label_visibility="collapsed"
             ) - 1
+
+        # ── Delete All confirmation banner ──
+        if st.session_state.get("confirm_delete_all"):
+            st.markdown("""
+            <div style="
+                background: rgba(220,53,69,0.06);
+                border: 1px solid rgba(220,53,69,0.28);
+                border-radius: 10px;
+                padding: 0.85rem 1.1rem;
+                margin-bottom: 0.8rem;
+                display: flex;
+                align-items: center;
+                gap: 0.6rem;
+            ">
+                <span style="font-size:1rem">⚠️</span>
+                <span style="color:#ff6b7a;font-size:0.87rem;font-weight:600;line-height:1.4">
+                    This will permanently delete <strong style="color:#ff4d5e">ALL</strong>
+                    scraped products and their competitors. This cannot be undone.
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
+            da1, da2, _ = st.columns([1.2, 1.2, 4])
+            with da1:
+                if st.button(
+                    "🗑 Yes, delete all",
+                    key="confirm_delete_all_yes",
+                    use_container_width=True,
+                    type="primary",
+                ):
+                    _db = Database()
+                    _db.delete_all_products()
+                    st.session_state.pop("confirm_delete_all", None)
+                    st.session_state.pop("analyzing_asin", None)
+                    st.rerun()
+            with da2:
+                if st.button("✖ Cancel", key="confirm_delete_all_no", use_container_width=True):
+                    st.session_state.pop("confirm_delete_all", None)
+                    st.rerun()
 
         start_idx = page * items_per_page
         end_idx = min(start_idx + items_per_page, len(products))

@@ -13,25 +13,3 @@ env/
 ENV/
 env.bak/
 venv.bak/
-
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Project specific
-data.json
-*.log
-logs/
-.cache/
-
-# Jupyter
-.ipynb_checkpoints/
-
-# UV
-uv.lock
