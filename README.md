@@ -193,7 +193,7 @@ AmazonScrapping/
 
 ---
 
-## 🎨 Design Philosophy
+## 🎨 Design
 
 ### 🌙 Dark Theme Excellence
 - **Reduced eye strain** for extended analysis sessions
@@ -281,7 +281,6 @@ Got questions? We're here to help!
 
 - 📧 **Email**: arizalansyori42@gmail.com
 - 🐛 **Issues**: [GitHub Issues](https://github.com/yourusername/AmazonScrapping/issues)
-- 📖 **Documentation**: [Wiki](https://github.com/yourusername/AmazonScrapping/wiki)
 
 ---
 
